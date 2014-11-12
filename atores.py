@@ -24,8 +24,10 @@ class Ator():
         """
         self.y = y
         self.x = x
-        self.caracter = self._caracter_ativo
         self.status = ATIVO
+
+    def caracter(self):
+        return self._caracter_ativo if self.status == ATIVO else self._caracter_destruido
 
     def calcular_posicao(self, tempo):
         """
@@ -35,7 +37,7 @@ class Ator():
         :param tempo: o tempo do jogo
         :return: posição x, y do ator
         """
-        return 1, 1
+        return self.x, self.y
 
     def colidir(self, outro_ator, intervalo=1):
         """
@@ -47,20 +49,27 @@ class Ator():
 
         :param outro_ator: Ator a ser considerado na colisão
         :param intervalo: Intervalo a ser considerado
+        :return:
         """
-        pass
+        if self.status == DESTRUIDO or outro_ator.status == DESTRUIDO:
+            return
+
+        if self.x - intervalo <= outro_ator.x <= self.x + intervalo and self.y - intervalo <= outro_ator.y <= self.y + intervalo:
+            self.status = DESTRUIDO
+            outro_ator.status = DESTRUIDO
 
 
 class Obstaculo(Ator):
-    pass
+    _caracter_ativo = 'O'
 
 
 class Porco(Ator):
-    pass
+    _caracter_ativo = '@'
+    _caracter_destruido = '+'
 
 
 class Passaro(Ator):
-    velocidade_escalar = 10
+    velocidade_escalar = None
 
     def __init__(self, x=0, y=0):
         """
@@ -84,7 +93,7 @@ class Passaro(Ator):
 
         :return: booleano
         """
-        return True
+        return self._tempo_de_lancamento is not None
 
     def colidir_com_chao(self):
         """
@@ -92,7 +101,22 @@ class Passaro(Ator):
         o status dos Passaro deve ser alterado para destruido, bem como o seu caracter
 
         """
-        pass
+        if self.y <= 0:
+            self.status = DESTRUIDO
+            self.caracter = self._caracter_destruido
+
+    def _calcular_posicao_horizontal(self, delta_t):
+        self.x = self._x_inicial + self.velocidade_escalar * delta_t * math.cos(self._angulo_de_lancamento)
+
+    def _calcular_posicao_vertical(self, delta_t):
+        self.y = (self._y_inicial +
+                  self.velocidade_escalar * delta_t * math.sin(self._angulo_de_lancamento) -
+                  (GRAVIDADE / 2) * delta_t ** 2)
+
+    def _calcular_posicao(self, tempo):
+        delta_t = tempo - self._tempo_de_lancamento
+        self._calcular_posicao_vertical(delta_t)
+        self._calcular_posicao_horizontal(delta_t)
 
     def calcular_posicao(self, tempo):
         """
@@ -108,7 +132,11 @@ class Passaro(Ator):
         :param tempo: tempo de jogo a ser calculada a posição
         :return: posição x, y
         """
-        return 1, 1
+        if self._tempo_de_lancamento is None:
+            return self._x_inicial, self._y_inicial
+        if self.status == ATIVO:
+            self._calcular_posicao(tempo)
+        return self.x, self.y
 
 
     def lancar(self, angulo, tempo_de_lancamento):
@@ -120,12 +148,23 @@ class Passaro(Ator):
         :param tempo_de_lancamento:
         :return:
         """
-        pass
+        self._tempo_de_lancamento = tempo_de_lancamento
+        self._angulo_de_lancamento = math.radians(angulo)
+
+    def _aguardando_lancamento(self, tempo):
+        return not self.foi_lancado() or tempo < self._tempo_de_lancamento
+
+    def _ja_colidiu(self):
+        return self.foi_lancado() and self.status() == DESTRUIDO
 
 
 class PassaroAmarelo(Passaro):
-    pass
+    velocidade_escalar = 30  # m/s
+    _caracter_ativo = 'A'
+    _caracter_destruido = 'a'
 
 
 class PassaroVermelho(Passaro):
-    pass
+    velocidade_escalar = 20  # m/s
+    _caracter_ativo = 'V'
+    _caracter_destruido = 'v'
